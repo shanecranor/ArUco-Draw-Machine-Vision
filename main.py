@@ -2,123 +2,195 @@ import cv2
 import sys
 import numpy as np
 import random
+def load_coefficients(path):
+    '''Loads camera matrix and distortion coefficients.'''
+    # FILE_STORAGE_READ
+    cv_file = cv2.FileStorage(path, cv2.FILE_STORAGE_READ)
+
+    # note we also have to specify the type to retrieve other wise we only get a
+    # FileNode object back instead of a matrix
+    camera_matrix = cv_file.getNode('K').mat()
+    dist_matrix = cv_file.getNode('D').mat()
+
+    cv_file.release()
+    return [camera_matrix, dist_matrix]
+def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
+    board = cv2.aruco.CharucoBoard_create(x_dim,y_dim,square_size,marker_size,aruco_dict)
+    board.ids += offset*int((x_dim*y_dim)/2.0);
+    return board
+
+
 
 def main(flags):
-    # Read images from a video file in the current folder
-    video_capture = cv2.VideoCapture("hw4.avi")  # Open video capture object
-    got_image, bgr_image = video_capture.read()  # Make sure we can read video
-    if not got_image:
-        print("Cannot read video source")
-        sys.exit()
-    img_height = bgr_image.shape[0]
-    img_width = bgr_image.shape[1]
+    # TEST CODE TO GENERATE 5 DIFFERENT CHARUCO BOARDS
+    # aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
+    # for i in range(5):
+    #     board = getCharucoBoard(6, 7, 10, 8, aruco_dict, i)
+    #     boardImg = board.draw((2000,2000))
+    #     cv2.imwrite("test"+str(i)+".png", boardImg)
+    # cv2.waitKey(0)
+
+    # set frame number to zero
+    frame = 0
+
+    framesWithDetected = 0
+    k, dist = load_coefficients('calibration_charuco.yml')
+    video_capture = cv2.VideoCapture("twoboardstest.mp4");
+
+    #get first frame
+    got_image, img = video_capture.read()
+    img_height, img_width = img.shape[0], img.shape[1]
 
     # start video writer
     if(flags['writeVideo']):
         fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
         videoWriter = cv2.VideoWriter("output.avi", fourcc=fourcc, fps=30.0,
                                       frameSize=(img_width, img_height))
-    f = 675.0
-    cx = 320.0
-    cy = 240.0
-    k = np.array([[f, 0, cx], [0, f, cy], [0, 0, 1]])
 
-    # set frame number to zero
-    frame = 0
-    # Read and show images until end of video is reached.
-    framesWithDetected = 0
-    while True:
-        thresh_img = convertToBinary(bgr_image, flags)
+    while got_image:
+        img_height, img_width = img.shape[0], img.shape[1]
+        thresh_img = convertToBinary(img)
         if (flags['showBinary']):
             cv2.imshow("binary image", thresh_img)
+        # create aruco board & dict
+        SQUARE_LENGTH = 1.9 #2.778125
+        MARKER_LENGTH = SQUARE_LENGTH * (8.0 / 10.0)
+        aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
+        board = getCharucoBoard(6, 7, SQUARE_LENGTH, MARKER_LENGTH, aruco_dict, 0)
+        arucoParams = cv2.aruco.DetectorParameters_create()
 
-        corners, ids = getArucoMarkers(thresh_img)
+        img_bin = convertToBinary(img)
+        corners, ids, rejected = cv2.aruco.detectMarkers(
+            img_bin,
+            aruco_dict,
+            parameters=arucoParams
+        )
+        # refine markers?
         if ids is not None:
-            framesWithDetected += 1
-            rvecs, tvecs = getArucoPositions(bgr_image, k, corners, ids)
-            for rvec, tvec, id in zip(rvecs, tvecs, ids):
-                cv2.aruco.drawAxis(image=bgr_image, cameraMatrix=k, distCoeffs=None, rvec=rvec, tvec=tvec, length=4)
+            resp, charucoCorners, charucoIds = cv2.aruco.interpolateCornersCharuco(
+                markerCorners=corners,
+                markerIds=ids,
+                image=img_bin,
+                board=board
+            )
+            if charucoIds is not None:
+                img = cv2.aruco.drawDetectedCornersCharuco(img, charucoCorners, charucoIds, (0, 0, 255))
+                _, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
+                    charucoCorners, charucoIds, board,
+                    cameraMatrix=k, distCoeffs=None, rvec=np.array([[0.0], [0.0], [0.0]]),
+                    tvec=np.array([[0.0], [0.0], [0.0]]))
+                cv2.aruco.drawAxis(image=img, cameraMatrix=k, distCoeffs=None, rvec=rvec, tvec=tvec, length=4)
                 scale = 2;
                 pHeight = 4;
-                pWidth = 1
-                basePoints = [0, 0, 0]
+                pWidth = 10
+                basePoints = [5, 5, 0]
                 axes = np.matrix([
-                    [basePoints[0] * scale - pHeight, basePoints[1] * scale + pWidth, basePoints[2] * scale + pWidth],
-                    [basePoints[0] * scale - pHeight, basePoints[1] * scale + pWidth, basePoints[2] * scale - pWidth],
-                    [basePoints[0] * scale - pHeight, basePoints[1] * scale - pWidth, basePoints[2] * scale - pWidth],
-                    [basePoints[0] * scale - pHeight, basePoints[1] * scale - pWidth, basePoints[2] * scale + pWidth],
-                    [basePoints[0] * scale, basePoints[1] * scale, basePoints[2] * scale],
+                    [basePoints[0] * scale + pWidth, basePoints[1] * scale + pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale + pWidth, basePoints[1] * scale - pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale - pWidth, basePoints[1] * scale - pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale - pWidth, basePoints[1] * scale + pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale, basePoints[1] * scale, basePoints[2] * scale]
                 ])
                 imagePoints, jacobian = cv2.projectPoints(np.float32(axes), rvec, tvec, k, None)
-                bgr_image = cv2.line(bgr_image,
-                                     tuple(np.int32(imagePoints[0]).ravel()),
-                                     tuple(np.int32(imagePoints[1]).ravel()), (0, 0, 255), 1)
-                bgr_image = cv2.line(bgr_image,
-                                     tuple(np.int32(imagePoints[1]).ravel()),
-                                     tuple(np.int32(imagePoints[2]).ravel()), (0, 0, 255), 1)
-                bgr_image = cv2.line(bgr_image,
-                                     tuple(np.int32(imagePoints[2]).ravel()),
-                                     tuple(np.int32(imagePoints[3]).ravel()), (0, 0, 255), 1)
-                bgr_image = cv2.line(bgr_image,
-                                     tuple(np.int32(imagePoints[3]).ravel()),
-                                     tuple(np.int32(imagePoints[0]).ravel()), (0, 0, 255), 1)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[0]).ravel()),
+                               tuple(np.int32(imagePoints[1]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[1]).ravel()),
+                               tuple(np.int32(imagePoints[2]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[2]).ravel()),
+                               tuple(np.int32(imagePoints[3]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[3]).ravel()),
+                               tuple(np.int32(imagePoints[0]).ravel()), (0, 0, 255), 1)
                 for i in range(4):
-                    bgr_image = cv2.line(bgr_image,
-                                         tuple(np.int32(imagePoints[i]).ravel()),
-                                         tuple(np.int32(imagePoints[4]).ravel()), (0, 0, 255), 1)
-        if (flags['writeVideo']):
-            videoWriter.write(bgr_image)
-        frame += 1
+                    img = cv2.line(img,
+                                   tuple(np.int32(imagePoints[i]).ravel()),
+                                   tuple(np.int32(imagePoints[4]).ravel()), (0, 0, 255), 4)
+        SQUARE_LENGTH = 1.9  # 2.778125
+        MARKER_LENGTH = SQUARE_LENGTH * (8.0 / 10.0)
+        aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
+        board = getCharucoBoard(6, 7, SQUARE_LENGTH, MARKER_LENGTH, aruco_dict, 1)
+        arucoParams = cv2.aruco.DetectorParameters_create()
 
-        cv2.imshow("boxes", bgr_image)
-        cv2.waitKey(1)
-        # read video frames
-        got_image, bgr_image = video_capture.read()
-        if not got_image:
-            break  # End of video; exit the while loop
+        img_bin = convertToBinary(img)
+        corners, ids, rejected = cv2.aruco.detectMarkers(
+            img_bin,
+            aruco_dict,
+            parameters=arucoParams
+        )
+        # refine markers?
+        if ids is not None:
+            resp, charucoCorners, charucoIds = cv2.aruco.interpolateCornersCharuco(
+                markerCorners=corners,
+                markerIds=ids,
+                image=img_bin,
+                board=board
+            )
+            if charucoIds is not None:
+                img = cv2.aruco.drawDetectedCornersCharuco(img, charucoCorners, charucoIds, (0, 0, 255))
+                _, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
+                    charucoCorners, charucoIds, board,
+                    cameraMatrix=k, distCoeffs=None, rvec=np.array([[0.0], [0.0], [0.0]]),
+                    tvec=np.array([[0.0], [0.0], [0.0]]))
+                cv2.aruco.drawAxis(image=img, cameraMatrix=k, distCoeffs=None, rvec=rvec, tvec=tvec, length=4)
+                scale = 2;
+                pHeight = 4;
+                pWidth = 10
+                basePoints = [5, 5, 0]
+                axes = np.matrix([
+                    [basePoints[0] * scale + pWidth, basePoints[1] * scale + pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale + pWidth, basePoints[1] * scale - pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale - pWidth, basePoints[1] * scale - pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale - pWidth, basePoints[1] * scale + pWidth, basePoints[2] * scale + pHeight],
+                    [basePoints[0] * scale, basePoints[1] * scale, basePoints[2] * scale]
+                ])
+                imagePoints, jacobian = cv2.projectPoints(np.float32(axes), rvec, tvec, k, None)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[0]).ravel()),
+                               tuple(np.int32(imagePoints[1]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[1]).ravel()),
+                               tuple(np.int32(imagePoints[2]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[2]).ravel()),
+                               tuple(np.int32(imagePoints[3]).ravel()), (0, 0, 255), 2)
+                img = cv2.line(img,
+                               tuple(np.int32(imagePoints[3]).ravel()),
+                               tuple(np.int32(imagePoints[0]).ravel()), (0, 0, 255), 1)
+                for i in range(4):
+                    img = cv2.line(img,
+                                   tuple(np.int32(imagePoints[i]).ravel()),
+                                   tuple(np.int32(imagePoints[4]).ravel()), (0, 0, 255), 4)
+        if (flags['writeVideo']):
+            videoWriter.write(img)
+        cv2.imshow("eee", img)
+        cv2.waitKey(30)
+        frame += 1
+        got_image, img = video_capture.read()
     videoWriter.release()
     print(framesWithDetected)
 
 
-def getArucoMarkers(thresh_img):
-    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
-    # Detect a marker.  Returns:
-    #   corners:   list of detected marker corners; for each marker, corners are clockwise)
-    #   ids:   vector of ids for the detected markers
-    corners, ids, _ = cv2.aruco.detectMarkers(
-        image=thresh_img,
-        dictionary=arucoDict
-    )
-    return corners, ids
 
-
-def getArucoPositions(bgr_image, cameraMatrix, corners, ids):
-    cv2.aruco.drawDetectedMarkers(
-        image=bgr_image, corners=corners, ids=ids, borderColor=(0, 0, 255)
-    )
-    rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-        corners=corners, markerLength=4,
-        cameraMatrix=cameraMatrix, distCoeffs=None)
-    return rvecs, tvecs
-
-
-def convertToBinary(bgr_image, flags):
+def convertToBinary(bgr_image):
     hsv_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
     planes = cv2.split(hsv_img)
     thresh_img = cv2.adaptiveThreshold(
         planes[2],
         maxValue=255,
-        adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C,
         thresholdType=cv2.THRESH_BINARY,
-        blockSize=69,
-        C=-3
+        blockSize=699,
+        C=-15
     )
     return thresh_img
 
 
 if __name__ == "__main__":
     main({
-        'writeVideo' : True,
+        'writeVideo' : False,
         'showBinary' : True
     })
 

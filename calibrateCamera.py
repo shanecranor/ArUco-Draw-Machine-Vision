@@ -56,7 +56,7 @@ def calibrate_charuco(marker_length, square_length):
         )
         if charuco_corners is not None:
             for corner in charuco_corners:
-                img_gray = cv2.circle(img_gray, (corner[0][0],corner[0][1]), 10, (255,0,255), -1)
+                img_gray = cv2.circle(img_gray, (corner[0][0], corner[0][1]), 10, (255,0,255), -1)
 
         # If a Charuco board was found, let's collect image/corner points
         # Requiring at least 20 squares
