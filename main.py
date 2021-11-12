@@ -23,12 +23,12 @@ def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
 
 def main(flags):
     # TEST CODE TO GENERATE 5 DIFFERENT CHARUCO BOARDS
-    # aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
-    # for i in range(5):
-    #     board = getCharucoBoard(6, 7, 10, 8, aruco_dict, i)
-    #     boardImg = board.draw((2000,2000))
-    #     cv2.imwrite("test"+str(i)+".png", boardImg)
-    # cv2.waitKey(0)
+    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
+    for i in range(4):
+        board = getCharucoBoard(8, 11, 10, 8, aruco_dict, i)
+        boardImg = board.draw((2000,2000))
+        cv2.imwrite("test"+str(i)+".png", boardImg)
+    cv2.waitKey(0)
 
     # set frame number to zero
     frame = 0
