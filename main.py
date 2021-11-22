@@ -44,15 +44,11 @@ def main(flags):
     while got_image:
         ft = time.time()
         thresh_img = convertToBinary(img)
-
         # create aruco board & dict
         aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
         arucoParams = cv2.aruco.DetectorParameters_create()
         #detect markers
-        fft = time.time()
         corners, ids, rejected = cv2.aruco.detectMarkers(thresh_img, aruco_dict, parameters=arucoParams, cameraMatrix=k)
-        et = time.time()
-        print(1 / (et - fft))
         canvasVecs = [None, None, None, None]
         drawing = False
         for i in range(4):
