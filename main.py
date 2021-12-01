@@ -73,7 +73,7 @@ def main(flags):
 						charucoCorners, charucoIds, board,
 						cameraMatrix=k, distCoeffs=None, rvec=np.array([[0.0], [0.0], [0.0]]),
 						tvec=np.array([[0.0], [0.0], [0.0]]))
-					if i == 2:
+					if i == 0:
 						#
 						img = drawPyramid(img, k, rvec, tvec, (255,0,0))
 						markerPoint = tvec;
@@ -136,27 +136,29 @@ def isOffScreen(img, point, k):
 	return pts[0] > s[0] or pts[1] > s[1] or pts[0] < 0 or pts[1] < 0
 
 
-def drawLines(img, pointsArr, canvasLoc, k, rvec):
+def drawLines(img, pointsArr, canvasLoc, k, canvasRvec):
 	axes = np.matrix([[0,0,0]])
-
 	for i in range(len(pointsArr) - 1):
 		#check if there is a gap, if there is, skip to next non gapped
 
 		if pointsArr[i] is not None and pointsArr[i + 1] is not None:
 			projPoint0 = np.matrix(pointsArr[i][0])
 			projPoint1 = np.matrix(pointsArr[i+1][0])
-			# imagePoints0, jacobian = cv2.projectPoints(np.float32(axes), rvec, pointsArr[i][0]+canvasLoc, k, None)
-			# imagePoints1, jacobian = cv2.projectPoints(np.float32(axes), rvec, pointsArr[i + 1][0]+canvasLoc, k, None)
-			imagePoints0, jacobian = cv2.projectPoints(np.float32(projPoint0), rvec, canvasLoc, k, None)
-			imagePoints1, jacobian = cv2.projectPoints(np.float32(projPoint1), rvec, canvasLoc, k, None)
+			imagePoints0, jacobian = cv2.projectPoints(np.float32(projPoint0), canvasRvec, canvasLoc, k, None)
+			imagePoints1, jacobian = cv2.projectPoints(np.float32(projPoint1), canvasRvec, canvasLoc, k, None)
+			# imagePoints0, jacobian = cv2.projectPoints(np.float32(axes), canvasRvec, pointsArr[i][0] + canvasLoc, k, None)
+			# imagePoints1, jacobian = cv2.projectPoints(np.float32(axes), canvasRvec, pointsArr[i + 1][0] + canvasLoc, k, None)
 			img = cv2.line(img,
 						   tuple(np.int32(imagePoints0).ravel()),
 						   tuple(np.int32(imagePoints1).ravel()), pointsArr[i][1], 2)
+
+
+
 	return img
 
 def drawPyramid(img, k, rvec, tvec, color=(0,0,255)):
 	scale = 2;
-	pHeight = 4;
+	pHeight = 10;
 	pWidth = 10
 	basePoints = [5, 5, 0]
 	axes = np.matrix([
