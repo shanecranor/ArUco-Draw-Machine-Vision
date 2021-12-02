@@ -27,7 +27,7 @@ def main(flags):
 	# set frame number to zero
 	frame = 0
 	#get first frame
-	video_capture = cv2.VideoCapture("cube.mp4");
+	video_capture = cv2.VideoCapture("flower.mp4");
 	got_image, img = video_capture.read()
 	img_height, img_width = img.shape[0], img.shape[1]
 
@@ -37,14 +37,17 @@ def main(flags):
 		videoWriter = cv2.VideoWriter("output.avi", fourcc=fourcc, fps=30.0,
 									  frameSize=(img_width, img_height))
 	linePoints = [];
-	canvasPositionVecs = [[0,0,0],[0,0,0],[0,0,0],[0,0,0]]
+	canvasPositionVecs = [np.array([[0.0], [0.0], [0.0]]),
+						  np.array([[0.0], [0.0], [0.0]]),
+						  np.array([[0.0], [0.0], [0.0]]),
+						  np.array([[0.0], [0.0], [0.0]])]
 	tempRvec = None
 	oldFt = 0
 	k, dist = calibration.load_coefficients('calibration_charuco.yml')
-	linePoints.append([[[-16],[0],[95]],[0,255,0]])
-	linePoints.append([[[-16],[0],[70]],[0,255,0]])
-	linePoints.append([[[-16],[10],[70]],[0,255,0]])
-	linePoints.append([[[-24],[10],[70]],[0,255,0]])
+	# linePoints.append([[[-16],[0],[95]],[0,255,0]])
+	# linePoints.append([[[-16],[0],[70]],[0,255,0]])
+	# linePoints.append([[[-16],[10],[70]],[0,255,0]])
+	# linePoints.append([[[-24],[10],[70]],[0,255,0]])
 	while got_image:
 		ft = time.time()
 		thresh_img = convertToBinary(img)
@@ -78,10 +81,10 @@ def main(flags):
 						img = drawPyramid(img, k, rvec, tvec, (255,0,0))
 						markerPoint = tvec;
 						#linePoints.append([tvec, (0,255,0)])
-					elif i == 1:
-						img = drawPyramid(img, k, rvec, tvec)
+					else:
+						img = drawPyramid(img, k, rvec, tvec, (i*63,i*63,i*63))
 						canvasVecs[i] = [tvec, rvec]
-						if i==1 and frame == 0:
+						if i == 1 and frame == 0:
 							tempRvec = rvec
 		if markerPoint is None:
 			linePoints.append(None)
@@ -92,13 +95,10 @@ def main(flags):
 				if pointIsValid(img, k, markerPoint) and pointIsValid(img, k, canvasLoc):
 					#np.array(canvasLoc, dtype="float"),"\n\n", markerPoint,
 					tempVec = markerPoint-canvasLoc
-					print(np.array(tempVec, dtype="float"), "TEMPVEC")
 					R, _ = cv2.Rodrigues(canvasRot*-1)
 					rotatedBoi = R @ tempVec
-					print(np.array(rotatedBoi, dtype="float"), "ROTBOI")
 					linePoints.append([rotatedBoi, (0,255,0)])
-				if(tempRvec is not None):
-					img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
+				img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
 
 		if flags['showFPS']:
 			fps = 1 / (ft - oldFt)
@@ -109,7 +109,7 @@ def main(flags):
 		if flags['showBinary']:
 			cv2.imshow("binary image", thresh_img)
 		cv2.imshow("live output", img)
-		cv2.waitKey(1)
+		cv2.waitKey(0)
 		frame += 1
 		got_image, img = video_capture.read()
 	if flags['writeVideo']:
@@ -119,10 +119,23 @@ def main(flags):
 # and then average them to get a more stable canvas location
 # right now it just returns the position of charuco board id == 1
 def calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs):
-	if pointIsValid(img, k, canvasVecs[1]):
-		return canvasVecs[1]
-	else:
+	out = [np.array([[0.0], [0.0], [0.0]]), np.array([[0.0], [0.0], [0.0]])]
+	count = 0;
+	for i in range(4):
+		if canvasVecs[i] is not None and pointIsValid(img, k, canvasVecs[1]):
+			print(canvasVecs[i][1],i)
+			out[0] += canvasVecs[i][0]-canvasPositionVecs[i]
+			for j in range(4):
+				diff = 0
+				if i != j and canvasVecs[j] is not None:
+					diff += np.linalg.norm(canvasVecs[i][1]-canvasVecs[j][1])
+			print("diff", diff)
+			if(diff < .5):
+				out[1] += canvasVecs[i][1]
+				count += 1
+	if count == 0 or canvasVecs[3] is None:
 		return None
+	return [canvasVecs[3][0], out[1] / count]
 
 
 def pointIsValid(img, k, point):
