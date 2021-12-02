@@ -78,7 +78,7 @@ def main(flags):
 						img = drawPyramid(img, k, rvec, tvec, (255,0,0))
 						markerPoint = tvec;
 						#linePoints.append([tvec, (0,255,0)])
-					else:
+					elif i == 1:
 						img = drawPyramid(img, k, rvec, tvec)
 						canvasVecs[i] = [tvec, rvec]
 						if i==1 and frame == 0:
@@ -89,9 +89,14 @@ def main(flags):
 			#calculate canvas position
 			if(calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
 				canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs)
-				if pointIsValid(img, k, markerPoint):
-					print(canvasLoc,"\n\n", markerPoint, "done")
-					linePoints.append([markerPoint-canvasLoc, (0,255,0)])
+				if pointIsValid(img, k, markerPoint) and pointIsValid(img, k, canvasLoc):
+					#np.array(canvasLoc, dtype="float"),"\n\n", markerPoint,
+					tempVec = markerPoint-canvasLoc
+					print(np.array(tempVec, dtype="float"), "TEMPVEC")
+					R, _ = cv2.Rodrigues(canvasRot*-1)
+					rotatedBoi = R @ tempVec
+					print(np.array(rotatedBoi, dtype="float"), "ROTBOI")
+					linePoints.append([rotatedBoi, (0,255,0)])
 				if(tempRvec is not None):
 					img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
 
