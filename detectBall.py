@@ -147,11 +147,7 @@ def calc_affine_transformation(matches_in_cluster, kp_train, kp_query):
 
     return A_train_query, inliers
 
-def detect_object_center(train_path, train_center_pt, query_path):
-
-    bgr_train = cv2.imread(train_path)  # Get training image
-    bgr_query = cv2.imread(query_path)  # Get query image
-
+def detect_object_center(bgr_train, bgr_query, train_center_pt):
     # Extract keypoints and descriptors.
     kp_train, desc_train = detect_features(bgr_train, show_features=False)
     kp_query, desc_query = detect_features(bgr_query, show_features=False)
@@ -172,8 +168,19 @@ def detect_object_center(train_path, train_center_pt, query_path):
 
     # Calculate an affine transformation from the training image to the query image.
     A_train_query, inliers = calc_affine_transformation(matches, kp_train, kp_query)
-
+    
     # Transform training center with A matrix to get query center point
     query_center_pt = A_train_query @ train_center_pt
 
     return query_center_pt
+
+def convert_to_image(camera_points):
+    return [camera_points[0] / camera_points[2], camera_points[1] / camera_points[2]]
+
+# 3D center -> 2D detect in image using center + center -> rvecs, tvecs
+def detect_with_PnP(bgr_train, bgr_query, center, k):
+
+    pts_2D = [convert_to_image(detect_object_center(bgr_train, bgr_query, center))]
+    pts_3D = [[center]]
+
+    return cv2.solvePnP(pts_3D, pts_2D, k, None)

@@ -8,12 +8,8 @@ import calibration
 
 def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
 	board = cv2.aruco.CharucoBoard_create(x_dim,y_dim,square_size,marker_size,aruco_dict)
-	board.ids += offset*int((x_dim*y_dim)/2.0);
+	board.ids += offset*int((x_dim*y_dim)/2.0)
 	return board
-
-
-
-
 
 def main(flags):
 	# TEST CODE TO GENERATE 5 DIFFERENT CHARUCO BOARDS
@@ -27,7 +23,7 @@ def main(flags):
 	# set frame number to zero
 	frame = 0
 	#get first frame
-	video_capture = cv2.VideoCapture("cube.mp4");
+	video_capture = cv2.VideoCapture("cube.mp4")
 	got_image, img = video_capture.read()
 	img_height, img_width = img.shape[0], img.shape[1]
 
@@ -36,17 +32,26 @@ def main(flags):
 		fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 		videoWriter = cv2.VideoWriter("output.avi", fourcc=fourcc, fps=30.0,
 									  frameSize=(img_width, img_height))
-	linePoints = [];
+	linePoints = []
 	canvasPositionVecs = [[0,0,0],[0,0,0],[0,0,0],[0,0,0]]
 	tempRvec = None
 	oldFt = 0
 	k, dist = calibration.load_coefficients('calibration_charuco.yml')
-	linePoints.append([[[-16],[0],[95]],[0,255,0]])
-	linePoints.append([[[-16],[0],[70]],[0,255,0]])
-	linePoints.append([[[-16],[10],[70]],[0,255,0]])
-	linePoints.append([[[-24],[10],[70]],[0,255,0]])
+	
+	# Get center of object to detect
+	center = []
+
+	# Get training image for detection
+	# bgr_train = cv2.imread(filename)
+
+	# Test pts
+	# linePoints.append([[[-16],[0],[95]],[0,255,0]])
+	# linePoints.append([[[-16],[0],[70]],[0,255,0]])
+	# linePoints.append([[[-16],[10],[70]],[0,255,0]])
+	# linePoints.append([[[-24],[10],[70]],[0,255,0]])
 	while got_image:
 		ft = time.time()
+		bgr_query = img
 		thresh_img = convertToBinary(img)
 		# create aruco board & dict
 		aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
@@ -55,7 +60,8 @@ def main(flags):
 		corners, ids, rejected = cv2.aruco.detectMarkers(thresh_img, aruco_dict, parameters=arucoParams, cameraMatrix=k)
 		canvasVecs = [None, None, None, None]
 		markerPoint = None
-
+		rvec = np.zeros((3,))
+		tvec = np.zeros((3,))
 		for i in range(4):
 			canvasVecs[i] = None
 			SQUARE_LENGTH = 2.96 #2.778125
@@ -71,29 +77,52 @@ def main(flags):
 					#img = cv2.aruco.drawDetectedCornersCharuco(img, charucoCorners, charucoIds, (0, 0, 255))
 					_, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
 						charucoCorners, charucoIds, board,
-						cameraMatrix=k, distCoeffs=None, rvec=np.array([[0.0], [0.0], [0.0]]),
-						tvec=np.array([[0.0], [0.0], [0.0]]))
+						cameraMatrix=k, distCoeffs=None, rvec=rvec,
+						tvec=tvec)
+					curr_r = rvec
+					curr_t = tvec
+					# s, rvecs, tvecs = detectBall.detect_with_PnP(bgr_train, bgr_query, center, k)
+					linePoints.append([rvec, tvec])
+
+					pts = [[0,0,0], [1,1,1]]
+					# # project points
+					# new_pts, jacobian = cv2.projectPoints(np.float32(pts), rvec, tvec, k, None)
+					# new_pts = np.array(new_pts, dtype=int).reshape(2, 2)
+					# linePoints.append([rvec, tvec])
+					# cv2.circle(img, new_pts[0], 3, (0,255,0))
+					# cv2.circle(img, new_pts[1], 3, (0,255,0))
+
 					if i == 0:
-						#
+						# Draw pyramid
 						img = drawPyramid(img, k, rvec, tvec, (255,0,0))
-						markerPoint = tvec;
+						#img, pt = testDrawPoint(img, k, rvec, tvec, (255,0,0))
+						# canvasVecs[i] = [tvec, rvec]
+						markerPoint = tvec
 						#linePoints.append([tvec, (0,255,0)])
+						for rvec, tvec in linePoints:
+							# project points
+							new_pts, jacobian = cv2.projectPoints(np.float32(pts), rvec, curr_t, k, None)
+							new_pts = np.array(new_pts, dtype=int).reshape(2, 2)
+							cv2.circle(img, new_pts[0], 3, (0,255,0))
+							cv2.circle(img, new_pts[1], 3, (0,255,0))
+
 					else:
 						img = drawPyramid(img, k, rvec, tvec)
 						canvasVecs[i] = [tvec, rvec]
 						if i==1 and frame == 0:
 							tempRvec = rvec
-		if markerPoint is None:
-			linePoints.append(None)
-		else:
-			#calculate canvas position
-			if(calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
-				canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs)
-				if pointIsValid(img, k, markerPoint):
-					print(canvasLoc,"\n\n", markerPoint, "done")
-					linePoints.append([markerPoint-canvasLoc, (0,255,0)])
-				if(tempRvec is not None):
-					img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
+
+		# if markerPoint is None:
+		# 	linePoints.append(None)
+		# else:
+		# 	#calculate canvas position
+		# 	if(calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
+		# 		canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs)
+		# 		if pointIsValid(img, k, markerPoint):
+		# 			print(markerPoint-canvasLoc, "done")
+		# 			linePoints.append([markerPoint-canvasLoc, (0,255,0)])
+		# 		if(tempRvec is not None):
+		# 			img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
 
 		if flags['showFPS']:
 			fps = 1 / (ft - oldFt)
@@ -152,13 +181,25 @@ def drawLines(img, pointsArr, canvasLoc, k, canvasRvec):
 						   tuple(np.int32(imagePoints0).ravel()),
 						   tuple(np.int32(imagePoints1).ravel()), pointsArr[i][1], 2)
 
-
-
 	return img
 
+def testDrawPoint(img, k, rvec, tvec, color=(0,0,255)):
+	scale = 2
+	pHeight = 10
+	pWidth = 10
+	basePoints = [5, 5, 0]
+	axes = np.matrix([
+		[basePoints[0] * scale + pWidth, basePoints[1] * scale + pWidth, basePoints[2] * scale + pHeight],
+	])
+	imagePoints, jacobian = cv2.projectPoints(np.float32(axes), rvec, tvec, k, None)
+	imagePoints = np.array(imagePoints[0][0], dtype=int)
+	img = cv2.circle(img, imagePoints, 3, (0,255,0), 3)
+
+	return img, imagePoints
+
 def drawPyramid(img, k, rvec, tvec, color=(0,0,255)):
-	scale = 2;
-	pHeight = 10;
+	scale = 2
+	pHeight = 10
 	pWidth = 10
 	basePoints = [5, 5, 0]
 	axes = np.matrix([
