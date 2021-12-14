@@ -11,9 +11,6 @@ def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
 	return board
 
 
-
-
-
 def main(flags):
 	frame = 0 #reset frame count
 	#get first frame
@@ -26,7 +23,6 @@ def main(flags):
 		videoWriter = cv2.VideoWriter("output.avi", fourcc=fourcc, fps=30.0,
 									  frameSize=(img_width, img_height))
 	linePoints = [];
-	canvasPositionVecs = [np.array([[0.0], [0.0], [0.0]])]*4
 	oldFt = 0
 	k, dist = calibration.load_coefficients('calibration/calibration_charuco.yml')
 	# create aruco board & dict
@@ -86,14 +82,14 @@ def main(flags):
 			linePoints.append(None)
 		else:
 			#calculate canvas position and add the marker location to the array
-			if(calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
-				canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs)
+			if(calculateCanvasLocation(img, k, canvasVecs) is not None):
+				canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs)
 				if pointsAreValid(img, k, [markerPoint, canvasLoc]):
 					#calculate marker point
 					R, _ = cv2.Rodrigues(canvasRot*-1)
 					rotated = R @ (markerPoint-canvasLoc)
 					linePoints.append([rotated, LINE_COLOR])
-		if (calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
+		if (calculateCanvasLocation(img, k, canvasVecs) is not None):
 			img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
 
 		if flags['showFPS']:
@@ -115,14 +111,13 @@ def main(flags):
 # and then average them to get a more stable canvas location
 # right now we just average the rotations because rotation is far more unstable than position.
 # we just use position of canvas ID 1
-def calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs):
+def calculateCanvasLocation(img, k, canvasVecs):
 	out = [np.array([[0.0], [0.0], [0.0]]), np.array([[0.0], [0.0], [0.0]])]
 	count = 0;
 	for i in range(4):
 		#skip canvas if it isn't there or isn't valid
 		if canvasVecs[i] is None or not pointIsValid(img, k, canvasVecs[1]):
 			continue
-		# out[0] += canvasVecs[i][0]-canvasPositionVecs[i]
 		# calculate the delta between the other canvases to see if there is an error
 		diff = 0
 		for j in range(4):
