@@ -85,10 +85,11 @@ def main(flags):
 		if markerPoint is None:
 			linePoints.append(None)
 		else:
-			#calculate canvas position
+			#calculate canvas position and add the marker location to the array
 			if(calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs) is not None):
 				canvasLoc, canvasRot = calculateCanvasLocation(img, k, canvasVecs, canvasPositionVecs)
 				if pointsAreValid(img, k, [markerPoint, canvasLoc]):
+					#calculate marker point
 					R, _ = cv2.Rodrigues(canvasRot*-1)
 					rotated = R @ (markerPoint-canvasLoc)
 					linePoints.append([rotated, LINE_COLOR])
