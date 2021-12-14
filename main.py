@@ -1,5 +1,4 @@
 import time
-
 import cv2
 import numpy as np
 from calibration import calibration
@@ -7,7 +6,7 @@ from calibration import calibration
 def main(flags):
 	frame = 0 #reset frame count
 	#get first frame
-	video_capture = cv2.VideoCapture("videos/demos/flower.mp4");
+	video_capture = cv2.VideoCapture(flags["VIDEO_FILE"]);
 	got_image, img = video_capture.read()
 	img_height, img_width = img.shape[0], img.shape[1]
 	if(flags['writeVideo']):
@@ -17,7 +16,7 @@ def main(flags):
 									  frameSize=(img_width, img_height))
 	linePoints = [];
 	oldFrameTime = 0
-	k, dist = calibration.load_coefficients('calibration/calibration_charuco.yml')
+	k, dist = calibration.load_coefficients(flags["CALIBRATION_FILE"])
 	# create aruco board & dict
 	aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
 	arucoParams = cv2.aruco.DetectorParameters_create()
@@ -30,6 +29,7 @@ def main(flags):
 			boardImg = board.draw((2000,2000))
 			cv2.imwrite("testLarge"+str(i)+".png", boardImg)
 		cv2.waitKey(0)
+
 	while got_image:
 		frameTime = time.time()
 		thresh_img = convertToBinary(img)
@@ -121,8 +121,11 @@ def calculateCanvasLocation(img, k, canvasVecs):
 		if(diff < .5):
 			out[1] += canvasVecs[i][1]
 			count += 1
-	if count == 0 or canvasVecs[3] is None:
+	if count == 0:
 		return None
+	#FOR TESTING SCRIPT
+	if canvasVecs[3] is None:
+		return [canvasVecs[1][0], out[1] / count]
 	return [canvasVecs[3][0], out[1] / count]
 
 
@@ -217,6 +220,8 @@ def convertToBinary(bgr_image):
 	return thresh_img
 
 
+
+
 if __name__ == "__main__":
 	main({
 		'writeVideo' : True,
@@ -225,10 +230,9 @@ if __name__ == "__main__":
 		'showDebug' : True,
 		'color' : (0, 255, 0),
 		'MARKER_ID' : 0,
-		'GENERATE_CHARUCO_IMAGES' : False
+		'GENERATE_CHARUCO_IMAGES' : False,
+		'VIDEO_FILE' : 'videos/demos/flower.mp4',
+		'CALIBRATION_FILE' : 'calibration/calibration_charuco.yml'
 	})
-
-
-
 
 

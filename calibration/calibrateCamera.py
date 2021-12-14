@@ -21,7 +21,7 @@ def convertToBinary(bgr_image):
         C=-15
     )
     return thresh_img
-
+#some code taken from OpenCV documentation
 def calibrate_charuco(marker_length, square_length):
     '''Apply camera calibration using aruco.
     The dimensions are in cm.

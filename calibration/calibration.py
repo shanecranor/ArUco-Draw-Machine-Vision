@@ -1,4 +1,5 @@
 import cv2
+#code taken from OpenCV documentation
 def load_coefficients(path):
     '''Loads camera matrix and distortion coefficients.'''
     # FILE_STORAGE_READ
