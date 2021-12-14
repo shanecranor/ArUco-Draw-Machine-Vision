@@ -4,13 +4,6 @@ import cv2
 import numpy as np
 from calibration import calibration
 
-
-def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
-	board = cv2.aruco.CharucoBoard_create(x_dim,y_dim,square_size,marker_size,aruco_dict)
-	board.ids += offset*int((x_dim*y_dim)/2.0);
-	return board
-
-
 def main(flags):
 	frame = 0 #reset frame count
 	#get first frame
@@ -23,14 +16,14 @@ def main(flags):
 		videoWriter = cv2.VideoWriter("output.avi", fourcc=fourcc, fps=30.0,
 									  frameSize=(img_width, img_height))
 	linePoints = [];
-	oldFt = 0
+	oldFrameTime = 0
 	k, dist = calibration.load_coefficients('calibration/calibration_charuco.yml')
 	# create aruco board & dict
 	aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
 	arucoParams = cv2.aruco.DetectorParameters_create()
 	LINE_COLOR = flags["color"]
 
-	if(flags["GENERATE_IMAGES"]):
+	if(flags["GENERATE_CHARUCO_IMAGES"]):
 		# TEST CODE TO GENERATE 5 DIFFERENT CHARUCO BOARDS
 		for i in range(4):
 			board = getCharucoBoard(5, 7, 10, 8, aruco_dict, i)
@@ -38,13 +31,13 @@ def main(flags):
 			cv2.imwrite("testLarge"+str(i)+".png", boardImg)
 		cv2.waitKey(0)
 	while got_image:
-		ft = time.time()
+		frameTime = time.time()
 		thresh_img = convertToBinary(img)
 		#detect markers
 		corners, ids, rejected = cv2.aruco.detectMarkers(thresh_img, aruco_dict, parameters=arucoParams, cameraMatrix=k)
 		canvasVecs = [None, None, None, None]
 		markerPoint = None
-
+		"""loop through each charuco board and read in the canvas vecs and marker vec"""
 		for i in range(4):
 			canvasVecs[i] = None
 			SQUARE_LENGTH = 2.96 #2.778125
@@ -78,6 +71,7 @@ def main(flags):
 					img = drawPyramid(img, k, rvec, tvec, (i*63,i*63,i*63))
 				canvasVecs[i] = [tvec, rvec]
 
+		"""START DRAWING!"""
 		if markerPoint is None:
 			linePoints.append(None)
 		else:
@@ -93,9 +87,9 @@ def main(flags):
 			img = drawLines(img, linePoints, canvasLoc, k, canvasRot)
 
 		if flags['showFPS']:
-			fps = 1 / (ft - oldFt)
+			fps = 1 / (frameTime - oldFrameTime)
 			cv2.putText(img, str(round(fps,2)), (7, 70), cv2.FONT_HERSHEY_SIMPLEX, 3, (100, 255, 0), 3, cv2.LINE_AA)
-		oldFt = ft
+		oldFrameTime = frameTime
 		if flags['writeVideo']:
 			videoWriter.write(img)
 		if flags['showBinary']:
@@ -203,6 +197,12 @@ def drawPyramid(img, k, rvec, tvec, color=(0,0,255)):
 	return img
 
 
+def getCharucoBoard(x_dim, y_dim, square_size, marker_size, aruco_dict, offset):
+	board = cv2.aruco.CharucoBoard_create(x_dim,y_dim,square_size,marker_size,aruco_dict)
+	board.ids += offset*int((x_dim*y_dim)/2.0);
+	return board
+
+
 def convertToBinary(bgr_image):
 	hsv_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
 	planes = cv2.split(hsv_img)
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 		'showDebug' : True,
 		'color' : (0, 255, 0),
 		'MARKER_ID' : 0,
-		'GENERATE_IMAGES' : False
+		'GENERATE_CHARUCO_IMAGES' : False
 	})
 
 
